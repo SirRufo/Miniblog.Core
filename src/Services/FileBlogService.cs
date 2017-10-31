@@ -130,7 +130,7 @@ namespace Miniblog.Core
 
             using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite))
             {
-                await doc.SaveAsync(fs, SaveOptions.None, CancellationToken.None).ConfigureAwait(false);
+                await doc.SaveAsync(fs, SaveOptions.None, CancellationToken.None);
             }
 
             if (!_cache.Contains(post))
@@ -171,7 +171,7 @@ namespace Miniblog.Core
             Directory.CreateDirectory(dir);
             using (var writer = new FileStream(absolute, FileMode.CreateNew))
             {
-                await writer.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+                await writer.WriteAsync(bytes, 0, bytes.Length);
             }
 
             return "/posts/" + relative;

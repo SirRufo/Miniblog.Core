@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Miniblog.Core.Models;
+using Miniblog.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,12 +16,13 @@ namespace Miniblog.Core
     public class FileBlogService : IBlogService
     {
         private List<Post> _cache = new List<Post>();
+        private IFileService _fileService;
         private IHttpContextAccessor _contextAccessor;
-        private string _folder;
+        private readonly string _folder = "posts";
 
-        public FileBlogService(IHostingEnvironment env, IHttpContextAccessor contextAccessor)
+        public FileBlogService(IFileService fileService, IHttpContextAccessor contextAccessor)
         {
-            _folder = Path.Combine(env.WebRootPath, "posts");
+            _fileService = fileService;
             _contextAccessor = contextAccessor;
 
             Initialize();
@@ -128,7 +130,7 @@ namespace Miniblog.Core
                     ));
             }
 
-            using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite))
+            using (var fs = _fileService.CreateFile(filePath))
             {
                 await doc.SaveAsync(fs, SaveOptions.None, CancellationToken.None);
             }
@@ -146,7 +148,7 @@ namespace Miniblog.Core
 
             if (File.Exists(filePath))
             {
-                File.Delete(filePath);
+                _fileService.DeleteFile(filePath);
             }
 
             if (_cache.Contains(post))
@@ -168,8 +170,8 @@ namespace Miniblog.Core
             string absolute = Path.Combine(_folder, relative);
             string dir = Path.GetDirectoryName(absolute);
 
-            Directory.CreateDirectory(dir);
-            using (var writer = new FileStream(absolute, FileMode.CreateNew))
+            _fileService.CreateDirectory(dir);
+            using (var writer = _fileService.CreateFile(absolute))
             {
                 await writer.WriteAsync(bytes, 0, bytes.Length);
             }
@@ -190,13 +192,18 @@ namespace Miniblog.Core
 
         private void LoadPosts()
         {
-            if (!Directory.Exists(_folder))
-                Directory.CreateDirectory(_folder);
+            if (!_fileService.DirectoryExists(_folder))
+                _fileService.CreateDirectory(_folder);
 
             // Can this be done in parallel to speed it up?
-            foreach (string file in Directory.EnumerateFiles(_folder, "*.xml", SearchOption.TopDirectoryOnly))
+            foreach (string file in _fileService.EnumerateFiles(_folder, "*.xml", SearchOption.TopDirectoryOnly))
             {
-                XElement doc = XElement.Load(file);
+                XElement doc;
+
+                using (var stream = _fileService.FileOpenRead(file))
+                {
+                    doc = XElement.Load(stream);
+                }
 
                 Post post = new Post()
                 {

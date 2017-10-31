@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore;
+﻿using Miniblog.Core.Services;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -44,6 +45,7 @@ namespace Miniblog.Core
         {
             services.AddMvc();
 
+            services.AddSingleton<IFileService, WebFileService>();
             services.AddSingleton<IBlogService, FileBlogService>();
             services.Configure<BlogSettings>(Configuration.GetSection("blog"));
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();

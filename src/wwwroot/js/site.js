@@ -1,10 +1,29 @@
-﻿(function () {
+﻿(function (window, document) {
+
+    // Lazy load stylesheets
+    requestAnimationFrame(function () {
+        var stylesheets = document.querySelectorAll("link[as=style]");
+
+        for (var i = 0; i < stylesheets.length; i++) {
+            var link = stylesheets[i];
+            link.setAttribute("rel", "stylesheet");
+            link.removeAttribute("as");
+        }
+    });
 
     // Show comment form. It's invisible by default in case visitor
     // has disabled javascript
     var commentForm = document.querySelector("#comments form");
     if (commentForm) {
         commentForm.classList.add("js-enabled");
+
+        commentForm.addEventListener("submit", function (e) {
+            this.querySelector("input[type=submit]").value = "Posting comment...";
+            var elements = this.elements;
+            for (var i = 0; i < elements.length; ++i) {
+                elements[i].readOnly = true;
+            }
+        });
     }
 
     // Expand comment form
@@ -123,4 +142,4 @@
         init();
     });
 
-})();
+})(window, document);

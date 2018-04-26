@@ -1,23 +1,28 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System;
+﻿using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Miniblog.Core.Models;
+using Miniblog.Core.Services;
+using WebEssentials.AspNetCore.Pwa;
 
-namespace Miniblog.Core.Models
+namespace Miniblog.Core.Controllers
 {
     public class BlogController : Controller
     {
-        private IBlogService _blog;
-        private IOptionsSnapshot<BlogSettings> _settings;
+        private readonly IBlogService _blog;
+        private readonly IOptionsSnapshot<BlogSettings> _settings;
+        private readonly WebManifest _manifest;
 
-        public BlogController(IBlogService blog, IOptionsSnapshot<BlogSettings> settings)
+        public BlogController(IBlogService blog, IOptionsSnapshot<BlogSettings> settings, WebManifest manifest)
         {
             _blog = blog;
             _settings = settings;
+            _manifest = manifest;
         }
 
         [Route("/{page:int?}")]
@@ -25,11 +30,11 @@ namespace Miniblog.Core.Models
         public async Task<IActionResult> Index([FromRoute]int page = 0)
         {
             var posts = await _blog.GetPosts(_settings.Value.PostsPerPage, _settings.Value.PostsPerPage * page);
-            ViewData["Title"] = _settings.Value.Name + " - A blog about ASP.NET & Visual Studio";
-            ViewData["Description"] = _settings.Value.Description;
+            ViewData["Title"] = _manifest.Name;
+            ViewData["Description"] = _manifest.Description;
             ViewData["prev"] = $"/{page + 1}/";
             ViewData["next"] = $"/{(page <= 1 ? null : page - 1 + "/")}";
-            return View("Views/Blog/Index.cshtml", posts);
+            return View("~/Views/Blog/Index.cshtml", posts);
         }
 
         [Route("/blog/category/{category}/{page:int?}")]
@@ -37,11 +42,11 @@ namespace Miniblog.Core.Models
         public async Task<IActionResult> Category(string category, int page = 0)
         {
             var posts = (await _blog.GetPostsByCategory(category)).Skip(_settings.Value.PostsPerPage * page).Take(_settings.Value.PostsPerPage);
-            ViewData["Title"] = _settings.Value.Name + " " + category;
+            ViewData["Title"] = _manifest.Name + " " + category;
             ViewData["Description"] = $"Articles posted in the {category} category";
             ViewData["prev"] = $"/blog/category/{category}/{page + 1}/";
             ViewData["next"] = $"/blog/category/{category}/{(page <= 1 ? null : page - 1 + "/")}";
-            return View("Views/Blog/Index.cshtml", posts);
+            return View("~/Views/Blog/Index.cshtml", posts);
         }
 
         // This is for redirecting potential existing URLs from the old Miniblog URL format
@@ -99,7 +104,6 @@ namespace Miniblog.Core.Models
 
             existing.Categories = categories.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(c => c.Trim().ToLowerInvariant()).ToList();
             existing.Title = post.Title.Trim();
-            existing.Slug = post.Slug.Trim();
             existing.Slug = !string.IsNullOrWhiteSpace(post.Slug) ? post.Slug.Trim() : Models.Post.CreateSlug(post.Title);
             existing.IsPublished = post.IsPublished;
             existing.Content = post.Content.Trim();

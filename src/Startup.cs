@@ -7,14 +7,14 @@ using Microsoft.AspNetCore.Rewrite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Net.Http.Headers;
-using System;
+using Miniblog.Core.Services;
 using WebEssentials.AspNetCore.OutputCaching;
 using WebMarkupMin.AspNetCore2;
 using WebMarkupMin.Core;
 using WilderMinds.MetaWeblog;
 
 using IWmmLogger = WebMarkupMin.Core.Loggers.ILogger;
+using MetaWeblogService = Miniblog.Core.Services.MetaWeblogService;
 using WmmNullLogger = WebMarkupMin.Core.Loggers.NullLogger;
 
 namespace Miniblog.Core
@@ -44,10 +44,17 @@ namespace Miniblog.Core
         {
             services.AddMvc();
 
+            services.AddSingleton<IUserServices, BlogUserServices>();
             services.AddSingleton<IBlogService, FileBlogService>();
             services.Configure<BlogSettings>(Configuration.GetSection("blog"));
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.AddMetaWeblog<MetaWeblogService>();
+
+            // Progressive Web Apps https://github.com/madskristensen/WebEssentials.AspNetCore.ServiceWorker
+            services.AddProgressiveWebApp(new WebEssentials.AspNetCore.Pwa.PwaOptions
+            {
+                OfflineRoute = "/shared/offline/"
+            });
 
             // Output caching (https://github.com/madskristensen/WebEssentials.AspNetCore.OutputCaching)
             services.AddOutputCaching(options =>
@@ -98,19 +105,25 @@ namespace Miniblog.Core
                 app.UseBrowserLink();
                 app.UseDeveloperExceptionPage();
             }
+            else
+            {
+                app.UseExceptionHandler("/Shared/Error");
+            }
 
-            app.UseStatusCodePages("text/plain", "Status code page, status code: {0}");
+            app.Use((context, next) =>
+            {
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                if (context.Request.IsHttps)
+                {
+                    context.Response.Headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
+                }
+                return next();
+            });
+
+            app.UseStatusCodePagesWithReExecute("/Shared/Error");
             app.UseWebOptimizer();
 
-            app.UseStaticFiles(new StaticFileOptions()
-            {
-                OnPrepareResponse = (context) =>
-                {
-                    var time = TimeSpan.FromDays(365);
-                    context.Context.Response.Headers[HeaderNames.CacheControl] = $"max-age={time.TotalSeconds.ToString()}";
-                    context.Context.Response.Headers[HeaderNames.Expires] = DateTime.UtcNow.Add(time).ToString("R");
-                }
-            });
+            app.UseStaticFilesWithCache();
 
             if (Configuration.GetValue<bool>("forcessl"))
             {
@@ -127,7 +140,7 @@ namespace Miniblog.Core
             {
                 routes.MapRoute(
                     name: "default",
-                    template: "{controller=Home}/{action=Index}/{id?}");
+                    template: "{controller=Blog}/{action=Index}/{id?}");
             });
         }
     }

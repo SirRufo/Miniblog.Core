@@ -1,24 +1,25 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Miniblog.Core.Controllers;
-using System;
+﻿using System;
 using System.Linq;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using WilderMinds.MetaWeblog;
 
-namespace Miniblog.Core
+namespace Miniblog.Core.Services
 {
     public class MetaWeblogService : IMetaWeblogProvider
     {
-        private IBlogService _blog;
-        private IConfiguration _config;
-        private IHttpContextAccessor _context;
+        private readonly IBlogService _blog;
+        private readonly IConfiguration _config;
+        private readonly IUserServices _userServices;
+        private readonly IHttpContextAccessor _context;
 
-        public MetaWeblogService(IBlogService blog, IConfiguration config, IHttpContextAccessor context)
+        public MetaWeblogService(IBlogService blog, IConfiguration config, IHttpContextAccessor context, IUserServices userServices)
         {
             _blog = blog;
             _config = config;
+            _userServices = userServices;
             _context = context;
         }
 
@@ -119,7 +120,7 @@ namespace Miniblog.Core
         {
             ValidateUser(username, password);
 
-            return _blog.GetPosts(numberOfPosts).GetAwaiter().GetResult().Select(p => ToMetaWebLogPost(p)).ToArray();
+            return _blog.GetPosts(numberOfPosts).GetAwaiter().GetResult().Select(ToMetaWebLogPost).ToArray();
         }
 
         public BlogInfo[] GetUsersBlogs(string key, string username, string password)
@@ -159,13 +160,13 @@ namespace Miniblog.Core
 
         private void ValidateUser(string username, string password)
         {
-            if (username != _config["user:username"] || !AccountController.VerifyHashedPassword(password, _config))
+            if (_userServices.ValidateUser(username, password))
             {
                 throw new MetaWeblogException("Unauthorized");
             }
 
             var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme);
-            identity.AddClaim(new Claim(ClaimTypes.Name, _config["user:username"]));
+            identity.AddClaim(new Claim(ClaimTypes.Name, username));
 
             _context.HttpContext.User = new ClaimsPrincipal(identity);
         }

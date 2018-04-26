@@ -1,26 +1,27 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Miniblog.Core.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.Xml.XPath;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Miniblog.Core.Models;
 
-namespace Miniblog.Core
+namespace Miniblog.Core.Services
 {
     public class FileBlogService : IBlogService
     {
-        private List<Post> _cache = new List<Post>();
-        private IHttpContextAccessor _contextAccessor;
-        private string _folder;
+        private readonly List<Post> _cache = new List<Post>();
+        private readonly IHttpContextAccessor _contextAccessor;
+        private readonly string _folder;
 
         public FileBlogService(IHostingEnvironment env, IHttpContextAccessor contextAccessor)
         {
-            _folder = Path.Combine(env.WebRootPath, "posts");
+            _folder = Path.Combine(env.WebRootPath, "Posts");
             _contextAccessor = contextAccessor;
 
             Initialize();
@@ -174,7 +175,7 @@ namespace Miniblog.Core
                 await writer.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
             }
 
-            return "/posts/" + relative;
+            return "/Posts/" + relative;
         }
 
         private string GetFilePath(Post post)
@@ -198,7 +199,7 @@ namespace Miniblog.Core
             {
                 XElement doc = XElement.Load(file);
 
-                Post post = new Post()
+                Post post = new Post
                 {
                     ID = Path.GetFileNameWithoutExtension(file),
                     Title = ReadValue(doc, "title"),
@@ -206,7 +207,7 @@ namespace Miniblog.Core
                     Content = ReadValue(doc, "content"),
                     Slug = ReadValue(doc, "slug").ToLowerInvariant(),
                     PubDate = DateTime.Parse(ReadValue(doc, "pubDate")),
-                    LastModified = DateTime.Parse(ReadValue(doc, "lastModified", DateTime.Now.ToString())),
+                    LastModified = DateTime.Parse(ReadValue(doc, "lastModified", DateTime.Now.ToString(CultureInfo.InvariantCulture))),
                     IsPublished = bool.Parse(ReadValue(doc, "ispublished", "true")),
                 };
 
@@ -258,7 +259,7 @@ namespace Miniblog.Core
         private static string ReadValue(XElement doc, XName name, string defaultValue = "")
         {
             if (doc.Element(name) != null)
-                return doc.Element(name).Value;
+                return doc.Element(name)?.Value;
 
             return defaultValue;
         }
@@ -266,7 +267,7 @@ namespace Miniblog.Core
         private static string ReadAttribute(XElement element, XName name, string defaultValue = "")
         {
             if (element.Attribute(name) != null)
-                return element.Attribute(name).Value;
+                return element.Attribute(name)?.Value;
 
             return defaultValue;
         }
